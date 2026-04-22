@@ -1,0 +1,65 @@
+                                                                                              
+
+  - render_preset_manager.py — added apply_carb_settings_dict(dict) -> restore_token so live    preview can push a pre-built dict using the same restore protocol as the file-based path.   
+
+  - movie_capture_controller.py — added two private fields (_live_preset_restore_token,         _live_preset_key); methods apply_live_preset(key), clear_live_preset(),
+
+  reset_render_preset(); shutdown() now calls clear_live_preset() so settings overrides don't
+
+  leak when the extension unloads.
+
+  - ui.py — dropdown change handler now calls controller.apply_live_preset(key) for the two
+
+  built-ins; added a "Reset" button next to "Load Preset" wired to
+
+  _on_reset_movie_capture_preset, which delegates to the controller and rebuilds the frame
+
+  (deliberately avoids re-firing the combo's change event to skip a rendermode flicker).
+
+  - model.py — untouched, per the constraint.
+
+  carb.settings keys used
+
+  - /rtx/rendermode → "RaytracedLighting" / "PathTracing" — confirmed in
+
+  omni.rtx.window.settings.rtx_settings_widget.engine_to_mode (Kit 109/110).
+
+  - /rtx/pathtracing/spp (← spp_per_iteration), /rtx/pathtracing/totalSpp (← path_trace_spp) —   confirmed in omni.kit.capture.viewport.extension.py (lines 598, 821, 898–899, 1402) and
+
+  omni.rtx.settings.core.widgets.pt_widgets.
+
+  - /rtx/pathtracing/mb/{subframes,fso,fsc} — inferred from the existing
+
+  _USD_KEY_TO_CAPTURE_FIELD mapping in movie_capture_controller.py (these are also
+
+  CaptureOptions-only fields with no obvious viewport-side reader on this Kit build, but
+
+  pushing them is harmless and keeps live/capture parity).
+
+  Kit-version guards
+
+  - The dropdown handler uses getattr(self, "_movie_capture_controller", None) and
+
+  hasattr(controller, "apply_live_preset") so older controller instances that pre-date this
+
+  change don't crash the UI.
+
+  - _BUILTIN_RENDER_MODE lookup before applying — unknown preset keys log + skip rather than
+
+  raise.
+
+  - All new carb.settings calls run through the existing RenderPresetManager apply/restore
+
+  plumbing, which already swallows per-key set/get failures so a missing key on a different
+
+  Kit build degrades gracefully.
+
+  Path-traced capture interaction
+
+  Verified the capture-time backend (extension.py:821, 898–899) saves
+
+  /rtx/pathtracing/spp/totalSpp on start and restores them on finish — restoring to the
+
+  live-applied values. So: live preview → start capture → finish → live preview is still
+
+  applied. The capture's restore does not clobber the live token.
